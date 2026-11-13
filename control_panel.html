@@ -1,132 +1,40 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Link Manager</title>
-    <style>
-        body { background-color: #1a202c; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; color: white; }
-        .card { background: #2d3748; border-radius: 15px; padding: 30px; width: 100%; max-width: 450px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
-        input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #4a5568; background: #1a202c; color: white; box-sizing: border-box; margin-bottom: 10px; }
-        .btn { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; background-color: #3182ce; color: white; margin-bottom: 5px; }
-        .current-link { background: #1a202c; padding: 10px; border-radius: 6px; font-size: 12px; color: #63b3ed; word-break: break-all; margin-bottom: 15px; border-left: 4px solid #63b3ed; }
-        #admin-content { display: none; }
-        .logout { background: #e53e3e; margin-top: 20px; }
-        label { display: block; margin-top: 15px; color: #a0aec0; font-size: 14px; font-weight: bold; }
-        h2 { font-size: 16px; margin: 0 0 10px 0; color: #cbd5e0; }
-    </style>
-</head>
-<body>
-
-<div class="card">
-    <div id="login-form">
-        <h1 style="text-align:center">Admin Login</h1>
-        <input type="email" id="email" placeholder="Admin Email">
-        <input type="password" id="password" placeholder="Password">
-        <button class="btn" onclick="login()">LOGIN</button>
-    </div>
-
-    <div id="admin-content">
-        <h1 style="color:#63b3ed; text-align:center; margin-bottom:25px;">Control Center</h1>
-        
-        <div style="margin-bottom: 30px; border-bottom: 1px solid #4a5568; padding-bottom: 10px;">
-            <h2>V1 (Group 1)</h2>
-            <label>Current Active Link:</label>
-            <div id="displayV1" class="current-link">Loading...</div>
-            <input type="text" id="urlV1" placeholder="Paste NEW link here (WhatsApp, Telegram, Website, etc.)...">
-            <button class="btn" style="background:#38a169" onclick="updateLink('page1', 'urlV1')">UPDATE V1 LINK</button>
-        </div>
-        
-        <button class="btn logout" onclick="logout()">LOGOUT</button>
-    </div>
-</div>
-
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
-
 <script>
-  const firebaseConfig = {
-  apiKey: "AIzaSyAFZYiKkkXjMWs1cGKyeb8j9fS0agk1WEg",
-  authDomain: "tkerry-df1a5.firebaseapp.com",
-  projectId: "tkerry-df1a5",
-  storageBucket: "tkerry-df1a5.firebasestorage.app",
-  messagingSenderId: "174040773129",
-  appId: "1:174040773129:web:d33b3f7502ab6f47003ed8",
-  measurementId: "G-S5Y7DRC04N"
-};
+  const DB_URL = "https://tkspoort-default-rtdb.firebaseio.com/links.json";
 
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.database();
-
-  auth.onAuthStateChanged(user => {
-    if (user) {
-      document.getElementById('login-form').style.display = 'none';
-      document.getElementById('admin-content').style.display = 'block';
-      loadCurrentLinks(); // Start showing the link once logged in
-    } else {
-      document.getElementById('login-form').style.display = 'block';
-      document.getElementById('admin-content').style.display = 'none';
+  // Load the current active link when the page opens
+  window.onload = async function() {
+    try {
+      const response = await fetch(DB_URL);
+      const data = await response.json();
+      if (data && data.v1) {
+        document.getElementById("current-link-display").innerText = data.v1;
+      }
+    } catch (error) {
+      console.error("Error loading link:", error);
     }
-  });
+  };
 
-  // THIS FUNCTION SHOWS THE LINK ON THE SCREEN
-  function loadCurrentLinks() {
-    db.ref('links/page1').on('value', snap => {
-        document.getElementById('displayV1').innerText = snap.val() || "No link set for V1";
-    });
+  // Save the new link to the cloud when clicking update
+  async function updateV1Link() {
+    const newLink = document.getElementById("new-link-input").value.trim();
+    if (!newLink) {
+      alert("Please paste a valid WhatsApp link first!");
+      return;
+    }
+
+    try {
+      await fetch(DB_URL, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ v1: newLink })
+      });
+      
+      document.getElementById("current-link-display").innerText = newLink;
+      document.getElementById("new-link-input").value = "";
+      alert("V1 Link Updated Live for Everyone!");
+    } catch (error) {
+      alert("Failed to update link. Check your internet connection.");
+    }
   }
-
-  function login() {
-    const e = document.getElementById('email').value;
-    const p = document.getElementById('password').value;
-    auth.signInWithEmailAndPassword(e, p).catch(err => alert("Login Failed: " + err.message));
-  }
-
-  function logout() { auth.signOut(); }
-
-  // UPDATED TO ACCEPT ANY LINK (WHATSAPP, TELEGRAM, WEBSITES, ETC.)
-  function updateLink(pageId, inputId) {
-    let newUrl = document.getElementById(inputId).value.trim();
-    if(!newUrl) return alert("Please paste a valid link!");
-
-    db.ref('links/' + pageId).set(newUrl)
-      .then(() => {
-          alert("Successfully updated!");
-          document.getElementById(inputId).value = "";
-      })
-      .catch(err => alert("Error: " + err.message));
-  }
-
-  // DISABLE RIGHT CLICK
-  document.addEventListener('contextmenu', function(e) {
-    e.preventDefault();
-  });
-
-  // DISABLE TEXT SELECTION AND COPYING
-  document.addEventListener('selectstart', function(e) {
-    e.preventDefault();
-  });
-  document.addEventListener('copy', function(e) {
-    e.preventDefault();
-  });
-
-  // DISABLE KEYBOARD SHORTCUTS (CTRL+U, CTRL+C, CTRL+S)
-  document.addEventListener('keydown', function(e) {
-    // Ctrl + U (View Source)
-    if (e.ctrlKey && (e.key === 'u' || e.key === 'U' || e.keyCode === 85)) {
-      e.preventDefault();
-    }
-    // Ctrl + C (Copy)
-    if (e.ctrlKey && (e.key === 'c' || e.key === 'C' || e.keyCode === 67)) {
-      e.preventDefault();
-    }
-    // Ctrl + S (Save Page)
-    if (e.ctrlKey && (e.key === 's' || e.key === 'S' || e.keyCode === 83)) {
-      e.preventDefault();
-    }
-  });
 </script>
-</body>
-</html>
